@@ -275,6 +275,7 @@ private fun CheckInCard(
 ) {
     val haptics = LocalHapticFeedback.current
     Card(
+        modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
         ),
@@ -455,6 +456,7 @@ private fun StatCard(label: String, value: String, modifier: Modifier = Modifier
 @Composable
 private fun TodayPlanCard(state: TodayUiState, onOpenPlan: () -> Unit) {
     Card(
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -521,6 +523,7 @@ private fun CalorieCard(
     val todayTotal = state.todayCalories.sumOf { it.kcal }
 
     Card(
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
