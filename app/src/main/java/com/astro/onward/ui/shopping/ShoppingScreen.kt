@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
@@ -31,8 +33,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import com.astro.onward.ui.theme.rememberReducedMotion
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -43,6 +47,11 @@ fun ShoppingScreen() {
     val vm: ShoppingViewModel = viewModel { ShoppingViewModel(this[APPLICATION_KEY] as OnwardApp) }
     val items by vm.items.collectAsStateWithLifecycle()
     var newItem by remember { mutableStateOf("") }
+    val reduced = rememberReducedMotion()
+    fun submit() {
+        vm.add(newItem)
+        newItem = ""
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -73,14 +82,13 @@ fun ShoppingScreen() {
                         onValueChange = { newItem = it },
                         label = { Text("Add something…") },
                         singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { if (newItem.isNotBlank()) submit() }),
                         modifier = Modifier.weight(1f),
                     )
                     Spacer(Modifier.width(8.dp))
                     IconButton(
-                        onClick = {
-                            vm.add(newItem)
-                            newItem = ""
-                        },
+                        onClick = ::submit,
                         enabled = newItem.isNotBlank(),
                     ) {
                         Icon(Icons.Outlined.Add, contentDescription = "Add item")
@@ -95,6 +103,7 @@ fun ShoppingScreen() {
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .then(if (reduced) Modifier else Modifier.animateItem())
                     .padding(vertical = 2.dp),
             ) {
                 Checkbox(

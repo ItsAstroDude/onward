@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -51,8 +53,19 @@ fun PlanScreen() {
     val vm: PlanViewModel = viewModel { PlanViewModel(this[APPLICATION_KEY] as OnwardApp) }
     val state by vm.state.collectAsStateWithLifecycle()
     var sheetTarget by remember { mutableStateOf<SheetTarget?>(null) }
+    val listState = rememberLazyListState()
+
+    // Land on today's card, not Monday's.
+    var scrolledToToday by remember { mutableStateOf(false) }
+    LaunchedEffect(state.days) {
+        if (!scrolledToToday && state.days.isNotEmpty()) {
+            scrolledToToday = true
+            if (state.todayIndex > 0) listState.animateScrollToItem(state.todayIndex + 1)
+        }
+    }
 
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),

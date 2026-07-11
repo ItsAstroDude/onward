@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:name="chevron_citrus"
+        android:pathData="M38,40 L54,54 L38,68"
+        android:strokeColor="@color/citrus"
+        android:strokeWidth="7"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:trimPathEnd="0" />
+    <path
+        android:name="chevron_white"
+        android:pathData="M54,40 L70,54 L54,68"
+        android:strokeColor="@color/offwhite"
+        android:strokeWidth="7"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:trimPathEnd="0" />
+</vector>

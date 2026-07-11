@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Base theme used before Compose takes over. Compose draws the real UI;
-         this just sets the launch/window background so there's no white flash. -->
+    <!-- Base theme used before Compose takes over. The system splash plays the
+         chevron draw-on animation on pine, then Compose staggers the UI in. -->
     <style name="Theme.Onward" parent="android:Theme.Material.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:windowBackground">@color/pine</item>
+        <item name="android:windowSplashScreenBackground">@color/pine</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_avd</item>
+        <item name="android:windowSplashScreenAnimationDuration">800</item>
     </style>
 </resources>

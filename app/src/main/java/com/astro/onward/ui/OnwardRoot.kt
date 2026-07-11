@@ -1,5 +1,13 @@
 package com.astro.onward.ui
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -39,6 +47,7 @@ import com.astro.onward.OnwardApp
 import com.astro.onward.data.AppSettings
 import com.astro.onward.ui.history.HistoryScreen
 import com.astro.onward.ui.onboarding.OnboardingScreen
+import com.astro.onward.ui.theme.rememberReducedMotion
 import com.astro.onward.updates.Updates
 import com.astro.onward.ui.plan.PlanScreen
 import com.astro.onward.ui.settings.SettingsScreen
@@ -154,10 +163,29 @@ private fun MainScaffold(
             }
         },
     ) { padding ->
+        val reduced = rememberReducedMotion()
         NavHost(
             navController = navController,
             startDestination = "today",
             modifier = Modifier.padding(padding),
+            enterTransition = {
+                if (reduced) {
+                    EnterTransition.None
+                } else {
+                    fadeIn(tween(250)) +
+                        slideInVertically(tween(300, easing = FastOutSlowInEasing)) { it / 24 }
+                }
+            },
+            exitTransition = { if (reduced) ExitTransition.None else fadeOut(tween(120)) },
+            popEnterTransition = { if (reduced) EnterTransition.None else fadeIn(tween(250)) },
+            popExitTransition = {
+                if (reduced) {
+                    ExitTransition.None
+                } else {
+                    fadeOut(tween(200)) +
+                        slideOutVertically(tween(250, easing = FastOutSlowInEasing)) { it / 24 }
+                }
+            },
         ) {
             composable("today") {
                 TodayScreen(

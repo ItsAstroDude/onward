@@ -1,17 +1,32 @@
 package com.astro.onward.ui.today
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,10 +36,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AcUnit
 import androidx.compose.material.icons.outlined.Close
@@ -45,21 +59,24 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.text.style.TextAlign
-import com.astro.onward.updates.Updates
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
@@ -69,6 +86,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.astro.onward.OnwardApp
 import com.astro.onward.data.DayStatus
 import com.astro.onward.ui.theme.rememberReducedMotion
+import com.astro.onward.updates.Updates
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle as JavaTextStyle
 import java.util.Locale
@@ -83,10 +101,26 @@ fun TodayScreen(
     val state by vm.state.collectAsStateWithLifecycle()
     val update by Updates.available.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val reduced = rememberReducedMotion()
 
-    LifecycleResumeEffect(Unit) {
-        vm.refresh()
-        onPauseOrDispose { }
+    // Cold-start stagger: sections rise into place one after another.
+    var entered by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { entered = true }
+
+    // Bumped only by a user tap on "Yes, hit it" — drives the celebration burst.
+    var celebration by remember { mutableIntStateOf(0) }
+
+    @Composable
+    fun Modifier.entry(index: Int): Modifier {
+        val progress by animateFloatAsState(
+            targetValue = if (entered || reduced) 1f else 0f,
+            animationSpec = if (reduced) snap() else tween(450, delayMillis = 70 * index, easing = FastOutSlowInEasing),
+            label = "entry$index",
+        )
+        return graphicsLayer {
+            alpha = progress
+            translationY = (1f - progress) * 40f
+        }
     }
 
     Column(
@@ -96,7 +130,7 @@ fun TodayScreen(
             .padding(horizontal = 20.dp),
     ) {
         Spacer(Modifier.height(12.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.entry(0)) {
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -132,22 +166,24 @@ fun TodayScreen(
             }
         }
 
-        update?.let { release ->
-            Spacer(Modifier.height(10.dp))
-            Surface(
-                shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.7f),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { Updates.download(context, release) },
-            ) {
-                Text(
-                    "v${release.version} is ready — tap to update ››",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(vertical = 8.dp),
-                )
+        Reveal(visible = update != null, reduced = reduced) {
+            Column {
+                Spacer(Modifier.height(10.dp))
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.7f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { update?.let { Updates.download(context, it) } },
+                ) {
+                    Text(
+                        "v${update?.version} is ready — tap to update ››",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(vertical = 8.dp),
+                    )
+                }
             }
         }
 
@@ -155,79 +191,135 @@ fun TodayScreen(
         StreakHero(
             run = state.streak.currentRun,
             todayHit = state.todayStatus == DayStatus.HIT,
-            modifier = Modifier.align(Alignment.CenterHorizontally),
+            celebration = celebration,
+            reduced = reduced,
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .entry(1),
         )
 
         Spacer(Modifier.height(20.dp))
-        CheckInCard(state, onAnswer = vm::checkIn, onChange = vm::clearToday)
+        CheckInCard(
+            state = state,
+            reduced = reduced,
+            onAnswer = { hit ->
+                if (hit) celebration++
+                vm.checkIn(hit)
+            },
+            onChange = vm::clearToday,
+            modifier = Modifier.entry(2),
+        )
 
-        if (state.yesterdayStatus == DayStatus.NONE && state.hasHistory) {
-            Spacer(Modifier.height(12.dp))
-            YesterdayGraceCard(onAnswer = vm::checkInYesterday)
+        Reveal(visible = state.yesterdayStatus == DayStatus.NONE && state.hasHistory, reduced = reduced) {
+            Column {
+                Spacer(Modifier.height(12.dp))
+                YesterdayGraceCard(onAnswer = vm::checkInYesterday)
+            }
         }
 
-        if (state.streak.freezeUsedThisWeek) {
-            Spacer(Modifier.height(12.dp))
-            Surface(
-                shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                modifier = Modifier.align(Alignment.CenterHorizontally),
-            ) {
-                Row(
-                    Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        Icons.Outlined.AcUnit,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.size(16.dp),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        "1 free miss used this week — covered",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+        Reveal(visible = state.streak.freezeUsedThisWeek, reduced = reduced) {
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                Spacer(Modifier.height(12.dp))
+                FreezePill()
             }
         }
 
         Spacer(Modifier.height(20.dp))
-        StatsRow(state)
+        StatsRow(state, Modifier.entry(3))
 
         Spacer(Modifier.height(16.dp))
-        TodayPlanCard(state, onOpenPlan)
+        TodayPlanCard(state, onOpenPlan, Modifier.entry(4))
 
         if (state.calorieEnabled) {
             Spacer(Modifier.height(16.dp))
-            CalorieCard(state, vm::addCalories, vm::removeCalories)
+            CalorieCard(state, reduced, vm::addCalories, vm::removeCalories, Modifier.entry(5))
         }
 
         Spacer(Modifier.height(24.dp))
     }
 }
 
+/** Expand/collapse wrapper for content that comes and goes (pills, chips). */
 @Composable
-private fun StreakHero(run: Int, todayHit: Boolean, modifier: Modifier = Modifier) {
-    val reducedMotion = rememberReducedMotion()
+private fun Reveal(visible: Boolean, reduced: Boolean, content: @Composable () -> Unit) {
+    if (reduced) {
+        if (visible) content()
+    } else {
+        AnimatedVisibility(
+            visible = visible,
+            enter = expandVertically(tween(300, easing = FastOutSlowInEasing)) + fadeIn(tween(300)),
+            exit = shrinkVertically(tween(250, easing = FastOutSlowInEasing)) + fadeOut(tween(200)),
+        ) { content() }
+    }
+}
+
+@Composable
+private fun FreezePill() {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+    ) {
+        Row(
+            Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Outlined.AcUnit,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.size(16.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                "1 free miss used this week — covered",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun StreakHero(
+    run: Int,
+    todayHit: Boolean,
+    celebration: Int,
+    reduced: Boolean,
+    modifier: Modifier = Modifier,
+) {
     val sweep by animateFloatAsState(
         targetValue = if (todayHit) 360f else 0f,
-        animationSpec = if (reducedMotion) snap() else tween(900, easing = FastOutSlowInEasing),
+        animationSpec = if (reduced) snap() else tween(900, easing = FastOutSlowInEasing),
         label = "sweep",
     )
     val scale by animateFloatAsState(
         targetValue = if (todayHit) 1f else 0.96f,
-        animationSpec = if (reducedMotion) {
+        animationSpec = if (reduced) {
             snap()
         } else {
             spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)
         },
         label = "scale",
     )
+    // The number rolls up to its value instead of teleporting.
+    val shownRun by animateIntAsState(
+        targetValue = run,
+        animationSpec = if (reduced) snap() else tween(700, easing = FastOutSlowInEasing),
+        label = "run",
+    )
+
+    // Citrus/sage rays that fire outward on a user check-in.
+    val burst = remember { Animatable(1f) }
+    LaunchedEffect(celebration) {
+        if (celebration > 0 && !reduced) {
+            burst.snapTo(0f)
+            burst.animateTo(1f, tween(750, easing = LinearOutSlowInEasing))
+        }
+    }
 
     val trackColor = MaterialTheme.colorScheme.surfaceVariant
     val citrus = MaterialTheme.colorScheme.tertiary
+    val sage = MaterialTheme.colorScheme.secondary
 
     Box(
         modifier = modifier
@@ -241,16 +333,37 @@ private fun StreakHero(run: Int, todayHit: Boolean, modifier: Modifier = Modifie
         Canvas(Modifier.fillMaxSize()) {
             val stroke = Stroke(width = 14.dp.toPx(), cap = StrokeCap.Round)
             val inset = stroke.width / 2
-            val arcSize = androidx.compose.ui.geometry.Size(size.width - stroke.width, size.height - stroke.width)
-            val topLeft = androidx.compose.ui.geometry.Offset(inset, inset)
+            val arcSize = Size(size.width - stroke.width, size.height - stroke.width)
+            val topLeft = Offset(inset, inset)
             drawArc(trackColor, -90f, 360f, false, topLeft = topLeft, size = arcSize, style = stroke)
             if (sweep > 0f) {
                 drawArc(citrus, -90f, sweep, false, topLeft = topLeft, size = arcSize, style = stroke)
             }
+
+            val p = burst.value
+            if (p < 1f) {
+                val center = Offset(size.width / 2, size.height / 2)
+                val baseRadius = size.minDimension / 2 + 4.dp.toPx()
+                val rayLength = 20.dp.toPx() * (0.3f + 0.7f * p)
+                val alpha = (1f - p).coerceIn(0f, 1f)
+                for (i in 0 until 12) {
+                    val angle = Math.toRadians(i * 30.0 - 90.0)
+                    val dir = Offset(kotlin.math.cos(angle).toFloat(), kotlin.math.sin(angle).toFloat())
+                    val start = center + dir * (baseRadius + p * 14.dp.toPx())
+                    drawLine(
+                        color = if (i % 2 == 0) citrus else sage,
+                        start = start,
+                        end = start + dir * rayLength,
+                        strokeWidth = 4.dp.toPx(),
+                        cap = StrokeCap.Round,
+                        alpha = alpha,
+                    )
+                }
+            }
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                run.toString(),
+                shownRun.toString(),
                 style = MaterialTheme.typography.displayLarge,
                 color = if (todayHit) citrus else MaterialTheme.colorScheme.onSurface,
             )
@@ -270,96 +383,124 @@ private fun StreakHero(run: Int, todayHit: Boolean, modifier: Modifier = Modifie
 @Composable
 private fun CheckInCard(
     state: TodayUiState,
+    reduced: Boolean,
     onAnswer: (Boolean) -> Unit,
     onChange: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val haptics = LocalHapticFeedback.current
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
         ),
         shape = RoundedCornerShape(24.dp),
     ) {
-        Column(Modifier.padding(20.dp)) {
-            when (state.todayStatus) {
-                DayStatus.NONE -> {
-                    Text("Hit the pattern today?", style = MaterialTheme.typography.headlineSmall)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "Mostly followed the shape of the day? That's a yes — 80% counts.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Row {
-                        Button(
-                            onClick = {
-                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                onAnswer(true)
+        AnimatedContent(
+            targetState = state.todayStatus,
+            transitionSpec = {
+                if (reduced) {
+                    fadeIn(snap()) togetherWith fadeOut(snap())
+                } else {
+                    (fadeIn(tween(300, delayMillis = 100)) + slideInVertically(tween(350, 100, FastOutSlowInEasing)) { it / 10 })
+                        .togetherWith(fadeOut(tween(120)))
+                }
+            },
+            label = "checkin",
+        ) { status ->
+            Column(Modifier.padding(20.dp)) {
+                when (status) {
+                    DayStatus.NONE -> {
+                        Text("Hit the pattern today?", style = MaterialTheme.typography.headlineSmall)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Mostly followed the shape of the day? That's a yes — 80% counts.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        Row {
+                            val pressSource = remember { MutableInteractionSource() }
+                            val pressed by pressSource.collectIsPressedAsState()
+                            val pressScale by animateFloatAsState(
+                                targetValue = if (pressed && !reduced) 0.95f else 1f,
+                                animationSpec = spring(stiffness = Spring.StiffnessMedium),
+                                label = "press",
+                            )
+                            Button(
+                                onClick = {
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    onAnswer(true)
+                                },
+                                interactionSource = pressSource,
+                                modifier = Modifier
+                                    .weight(1.4f)
+                                    .graphicsLayer {
+                                        scaleX = pressScale
+                                        scaleY = pressScale
+                                    },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                ),
+                            ) { Text("Yes, hit it") }
+                            Spacer(Modifier.width(10.dp))
+                            OutlinedButton(
+                                onClick = { onAnswer(false) },
+                                modifier = Modifier.weight(1f),
+                            ) { Text("Not really") }
+                        }
+                    }
+                    DayStatus.HIT -> {
+                        val milestone = when (state.streak.currentRun) {
+                            7 -> "A full week"
+                            14 -> "Two weeks strong"
+                            30 -> "A whole month"
+                            50 -> "Fifty days"
+                            100 -> "A hundred days"
+                            365 -> "A whole year"
+                            else -> null
+                        }
+                        Text(
+                            if (milestone != null) {
+                                "$milestone. Day ${state.streak.currentRun}. ✓"
+                            } else {
+                                "Locked in. Day ${state.streak.currentRun}. ✓"
                             },
-                            modifier = Modifier.weight(1.4f),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                            ),
-                        ) { Text("Yes, hit it") }
-                        Spacer(Modifier.width(10.dp))
-                        OutlinedButton(
-                            onClick = { onAnswer(false) },
-                            modifier = Modifier.weight(1f),
-                        ) { Text("Not really") }
-                    }
-                }
-                DayStatus.HIT -> {
-                    val milestone = when (state.streak.currentRun) {
-                        7 -> "A full week"
-                        14 -> "Two weeks strong"
-                        30 -> "A whole month"
-                        50 -> "Fifty days"
-                        100 -> "A hundred days"
-                        365 -> "A whole year"
-                        else -> null
-                    }
-                    Text(
-                        if (milestone != null) {
-                            "$milestone. Day ${state.streak.currentRun}. ✓"
-                        } else {
-                            "Locked in. Day ${state.streak.currentRun}. ✓"
-                        },
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.tertiary,
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        if (milestone != null) {
-                            "That's not luck — that's a pattern. Onward."
-                        } else {
-                            "Beautiful. See you at tomorrow's shake."
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    ChangeAnswer(onChange)
-                }
-                else -> {
-                    if (state.freezeAbsorbedToday) {
-                        Text("Covered by your free miss.", style = MaterialTheme.typography.headlineSmall)
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = MaterialTheme.colorScheme.tertiary,
+                        )
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            "The run is safe. Onward — tomorrow's a fresh plate.",
+                            if (milestone != null) {
+                                "That's not luck — that's a pattern. Onward."
+                            } else {
+                                "Beautiful. See you at tomorrow's shake."
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                    } else {
-                        Text("Logged. New run starts today.", style = MaterialTheme.typography.headlineSmall)
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            "No stress — one good day gets it going again. Onward.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        ChangeAnswer(onChange)
                     }
-                    ChangeAnswer(onChange)
+                    else -> {
+                        if (state.freezeAbsorbedToday) {
+                            Text("Covered by your free miss.", style = MaterialTheme.typography.headlineSmall)
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                "The run is safe. Onward — tomorrow's a fresh plate.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        } else {
+                            Text("Logged. New run starts today.", style = MaterialTheme.typography.headlineSmall)
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                "No stress — one good day gets it going again. Onward.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        ChangeAnswer(onChange)
+                    }
                 }
             }
         }
@@ -369,6 +510,7 @@ private fun CheckInCard(
 @Composable
 private fun YesterdayGraceCard(onAnswer: (Boolean) -> Unit) {
     Card(
+        modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
         ),
@@ -406,9 +548,9 @@ private fun ChangeAnswer(onChange: () -> Unit) {
 }
 
 @Composable
-private fun StatsRow(state: TodayUiState) {
+private fun StatsRow(state: TodayUiState, modifier: Modifier = Modifier) {
     val monthWin = state.streak.monthPercent >= 80
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = modifier) {
         StatCard("Longest run", "${state.streak.longestRun}", Modifier.weight(1f))
         StatCard(
             if (monthWin) "This month — a win" else "This month",
@@ -454,9 +596,9 @@ private fun StatCard(label: String, value: String, modifier: Modifier = Modifier
 }
 
 @Composable
-private fun TodayPlanCard(state: TodayUiState, onOpenPlan: () -> Unit) {
+private fun TodayPlanCard(state: TodayUiState, onOpenPlan: () -> Unit, modifier: Modifier = Modifier) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -480,7 +622,7 @@ private fun TodayPlanCard(state: TodayUiState, onOpenPlan: () -> Unit) {
                 MealRow("🥗", "Dinner", plan.dinnerExample)
             }
             Spacer(Modifier.height(4.dp))
-            TextButton(onClick = onOpenPlan, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
+            TextButton(onClick = onOpenPlan, contentPadding = PaddingValues(0.dp)) {
                 Text("Full week plan ››", style = MaterialTheme.typography.labelLarge)
             }
         }
@@ -516,14 +658,16 @@ private val presets = listOf(
 @Composable
 private fun CalorieCard(
     state: TodayUiState,
+    reduced: Boolean,
     onAdd: (String, Int) -> Unit,
     onRemove: (Long) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var showCustom by remember { mutableStateOf(false) }
     val todayTotal = state.todayCalories.sumOf { it.kcal }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -547,9 +691,6 @@ private fun CalorieCard(
                     )
                 }
                 AssistChip(onClick = { showCustom = true }, label = { Text("+ custom") })
-            }
-            if (showCustom) {
-                CustomCalorieDialog(onDismiss = { showCustom = false }, onAdd = onAdd)
             }
 
             if (state.todayCalories.isNotEmpty()) {
@@ -579,7 +720,7 @@ private fun CalorieCard(
             }
 
             Spacer(Modifier.height(12.dp))
-            WeekBars(state.weekTotals)
+            WeekBars(state.weekTotals, reduced)
             Spacer(Modifier.height(10.dp))
             Text(
                 "A real target (like a deficit size) should come from your cardiologist or a dietitian — this is just a rough picture. It never touches the streak.",
@@ -588,10 +729,14 @@ private fun CalorieCard(
             )
         }
     }
+
+    if (showCustom) {
+        CustomCalorieDialog(onDismiss = { showCustom = false }, onAdd = onAdd)
+    }
 }
 
 @Composable
-private fun WeekBars(totals: List<Pair<Long, Int>>) {
+private fun WeekBars(totals: List<Pair<Long, Int>>, reduced: Boolean) {
     val max = (totals.maxOfOrNull { it.second } ?: 0).coerceAtLeast(1)
     val nonZeroDays = totals.count { it.second > 0 }
     val avg = if (nonZeroDays == 0) 0 else totals.sumOf { it.second } / nonZeroDays
@@ -604,7 +749,11 @@ private fun WeekBars(totals: List<Pair<Long, Int>>) {
                 .height(56.dp),
         ) {
             totals.forEach { (day, total) ->
-                val fraction = total.toFloat() / max
+                val fraction by animateFloatAsState(
+                    targetValue = total.toFloat() / max,
+                    animationSpec = if (reduced) snap() else tween(500, easing = FastOutSlowInEasing),
+                    label = "bar$day",
+                )
                 Column(
                     modifier = Modifier.weight(1f),
                     horizontalAlignment = Alignment.CenterHorizontally,

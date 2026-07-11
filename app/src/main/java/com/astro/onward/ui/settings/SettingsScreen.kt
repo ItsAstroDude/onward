@@ -255,6 +255,7 @@ private fun DataCard() {
 @Composable
 private fun SettingsCard(content: @Composable () -> Unit) {
     Card(
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
