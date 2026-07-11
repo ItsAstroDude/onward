@@ -19,6 +19,18 @@ over-limit states, or streak penalties to it. The default experience must stay o
   then `.\gradlew.bat :app:assembleDebug`.
 - `local.properties` must point at `C:\Users\andre\AppData\Local\Android\Sdk`.
 
+## Release signing & OTA (v0.2+) — the rules that can't be broken
+
+- Keystore: `C:\Users\andre\.android\onward-release.keystore`, referenced by the gitignored
+  `key.properties` at repo root. **Losing this keystore = installed devices can never update in
+  place.** Never sign a release with a different key.
+- OTA: `updates/Updates.kt` polls `https://api.github.com/repos/ItsAstroDude/onward/releases/latest`
+  (repo must stay PUBLIC or the unauthenticated check breaks), compares the tag against
+  `BuildConfig.VERSION_NAME`, downloads the release's `.apk` asset via DownloadManager, and
+  `UpdateInstallReceiver` hands it to the package installer.
+- Ship flow: bump `versionCode`/`versionName` → `.\gradlew.bat :app:assembleRelease` →
+  `gh release create vX.Y.Z <apk>` → installed apps see it within a day (or "Check now").
+
 ## Architecture
 
 Single module, MVVM-lite, no DI framework. `OnwardApp` (Application) exposes `database` +
@@ -42,9 +54,13 @@ com.astro.onward
 │   ├── ReminderScheduler.kt per-reminder unique OneTimeWork delayed to next occurrence
 │   └── ReminderWorker.kt   fires notification, reschedules itself (no boot receiver needed —
 │                           WorkManager persists across reboots)
+├── updates/Updates.kt      GitHub-releases self-updater (see OTA section above)
+├── widget/                 Glance widget: 4 responsive breakpoints (tiny→full), pine/citrus,
+│                           one-tap check-off via ActionCallback; WidgetRefreshWorker re-renders
+│                           after midnight; every streak write calls OnwardWidget().updateAll()
 └── ui/
     ├── OnwardRoot.kt       onboarding gate → 4-tab scaffold (today/plan/sheet/shopping)
-    │                       + pushed settings route; deep-link consumption
+    │                       + pushed settings/history routes; deep-link consumption
     ├── theme/              pine #1E4635 · citrus #E8813A (STREAK/POSITIVE MOMENTS ONLY) ·
     │                       off-white #F5F6F1; Fraunces (display) + Inter (body), bundled
     │                       variable TTFs in res/font; rememberReducedMotion()

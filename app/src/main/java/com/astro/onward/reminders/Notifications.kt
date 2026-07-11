@@ -43,15 +43,27 @@ object Notifications {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_onward)
             .setContentTitle("Onward")
             .setContentText(message)
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
             .setContentIntent(pending)
             .setAutoCancel(true)
-            .build()
 
-        context.getSystemService(NotificationManager::class.java).notify(id, notification)
+        // The check-off nudge gets a one-tap action — no need to open the app.
+        if (destination == "today") {
+            val checkIn = Intent(context, CheckInReceiver::class.java)
+                .setAction(CheckInReceiver.ACTION)
+            builder.addAction(
+                0, "✓ Hit it",
+                PendingIntent.getBroadcast(
+                    context, 100 + id, checkIn,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                ),
+            )
+        }
+
+        context.getSystemService(NotificationManager::class.java).notify(id, builder.build())
     }
 }

@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Onward</string>
+    <string name="widget_label">Streak</string>
+    <string name="widget_description">Your streak at a glance — check off the day without opening the app.</string>
 </resources>

@@ -24,9 +24,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AcUnit
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -53,7 +55,10 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.style.TextAlign
+import com.astro.onward.updates.Updates
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -69,9 +74,15 @@ import java.time.format.TextStyle as JavaTextStyle
 import java.util.Locale
 
 @Composable
-fun TodayScreen(onOpenPlan: () -> Unit, onOpenSettings: () -> Unit) {
+fun TodayScreen(
+    onOpenPlan: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenHistory: () -> Unit,
+) {
     val vm: TodayViewModel = viewModel { TodayViewModel(this[APPLICATION_KEY] as OnwardApp) }
     val state by vm.state.collectAsStateWithLifecycle()
+    val update by Updates.available.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
     LifecycleResumeEffect(Unit) {
         vm.refresh()
@@ -105,11 +116,37 @@ fun TodayScreen(onOpenPlan: () -> Unit, onOpenSettings: () -> Unit) {
                     style = MaterialTheme.typography.headlineSmall,
                 )
             }
+            IconButton(onClick = onOpenHistory) {
+                Icon(
+                    Icons.Outlined.History,
+                    contentDescription = "History",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             IconButton(onClick = onOpenSettings) {
                 Icon(
                     Icons.Outlined.Settings,
                     contentDescription = "Settings",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        update?.let { release ->
+            Spacer(Modifier.height(10.dp))
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.7f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { Updates.download(context, release) },
+            ) {
+                Text(
+                    "v${release.version} is ready — tap to update ››",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(vertical = 8.dp),
                 )
             }
         }
@@ -123,6 +160,11 @@ fun TodayScreen(onOpenPlan: () -> Unit, onOpenSettings: () -> Unit) {
 
         Spacer(Modifier.height(20.dp))
         CheckInCard(state, onAnswer = vm::checkIn, onChange = vm::clearToday)
+
+        if (state.yesterdayStatus == DayStatus.NONE && state.hasHistory) {
+            Spacer(Modifier.height(12.dp))
+            YesterdayGraceCard(onAnswer = vm::checkInYesterday)
+        }
 
         if (state.streak.freezeUsedThisWeek) {
             Spacer(Modifier.height(12.dp))
@@ -268,14 +310,31 @@ private fun CheckInCard(
                     }
                 }
                 DayStatus.HIT -> {
+                    val milestone = when (state.streak.currentRun) {
+                        7 -> "A full week"
+                        14 -> "Two weeks strong"
+                        30 -> "A whole month"
+                        50 -> "Fifty days"
+                        100 -> "A hundred days"
+                        365 -> "A whole year"
+                        else -> null
+                    }
                     Text(
-                        "Locked in. Day ${state.streak.currentRun}. ✓",
+                        if (milestone != null) {
+                            "$milestone. Day ${state.streak.currentRun}. ✓"
+                        } else {
+                            "Locked in. Day ${state.streak.currentRun}. ✓"
+                        },
                         style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.tertiary,
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "Beautiful. See you at tomorrow's shake.",
+                        if (milestone != null) {
+                            "That's not luck — that's a pattern. Onward."
+                        } else {
+                            "Beautiful. See you at tomorrow's shake."
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -301,6 +360,34 @@ private fun CheckInCard(
                     }
                     ChangeAnswer(onChange)
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun YesterdayGraceCard(onAnswer: (Boolean) -> Unit) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        ),
+        shape = RoundedCornerShape(20.dp),
+    ) {
+        Row(
+            Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("And yesterday?", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "No stress either way.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            TextButton(onClick = { onAnswer(true) }) { Text("Hit it") }
+            TextButton(onClick = { onAnswer(false) }) {
+                Text("Not really", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

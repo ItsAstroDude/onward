@@ -16,6 +16,9 @@ interface DayEntryDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entry: DayEntry)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(entries: List<DayEntry>)
+
     @Query("DELETE FROM day_entries WHERE epochDay = :epochDay")
     suspend fun delete(epochDay: Long)
 }
@@ -27,6 +30,9 @@ interface PlanDao {
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertDays(days: List<PlanDay>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun replaceDays(days: List<PlanDay>)
 
     @Update
     suspend fun updateDay(day: PlanDay)
@@ -63,6 +69,9 @@ interface ShoppingDao {
 
     @Query("UPDATE shopping_items SET checked = 0")
     suspend fun uncheckAll()
+
+    @Query("DELETE FROM shopping_items")
+    suspend fun clearAll()
 }
 
 @Dao
@@ -78,6 +87,9 @@ interface ReminderDao {
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(reminders: List<ReminderSetting>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun replaceAll(reminders: List<ReminderSetting>)
 
     @Update
     suspend fun update(reminder: ReminderSetting)
@@ -103,6 +115,12 @@ interface CalorieDao {
     @Insert
     suspend fun insert(entry: CalorieEntry)
 
+    @Insert
+    suspend fun insertAll(entries: List<CalorieEntry>)
+
     @Query("DELETE FROM calorie_entries WHERE id = :id")
     suspend fun delete(id: Long)
+
+    @Query("DELETE FROM calorie_entries")
+    suspend fun clearAll()
 }

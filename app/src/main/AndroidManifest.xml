@@ -3,6 +3,10 @@
 
     <!-- Reminders are local notifications (Android 13+ runtime permission). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Only used by the update checker (GitHub Releases). The app itself stays offline. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Lets the downloaded update APK launch the package installer. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:name=".OnwardApp"
@@ -24,6 +28,33 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- "✓ Hit it" action on the 21:30 check-off notification. -->
+        <receiver
+            android:name=".reminders.CheckInReceiver"
+            android:exported="false" />
+
+        <!-- Launches the installer once an update APK finishes downloading. -->
+        <receiver
+            android:name=".updates.UpdateInstallReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.DOWNLOAD_COMPLETE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Home/cover-screen streak widget. -->
+        <receiver
+            android:name=".widget.OnwardWidgetReceiver"
+            android:exported="false"
+            android:label="@string/widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/onward_widget_info" />
+        </receiver>
     </application>
 
 </manifest>

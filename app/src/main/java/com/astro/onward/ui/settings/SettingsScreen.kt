@@ -1,8 +1,10 @@
 package com.astro.onward.ui.settings
 
 import android.Manifest
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.glance.appwidget.updateAll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -35,16 +37,23 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.astro.onward.BuildConfig
 import com.astro.onward.OnwardApp
+import com.astro.onward.data.Backup
 import com.astro.onward.data.ReminderSetting
 import com.astro.onward.data.SeedData
+import com.astro.onward.updates.Updates
+import com.astro.onward.widget.OnwardWidget
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 @Composable
@@ -128,6 +137,12 @@ fun SettingsScreen(onBack: () -> Unit) {
         }
 
         Spacer(Modifier.height(14.dp))
+        UpdatesCard()
+
+        Spacer(Modifier.height(14.dp))
+        DataCard()
+
+        Spacer(Modifier.height(14.dp))
         SettingsCard {
             Text("The fine print", style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(6.dp))
@@ -151,6 +166,89 @@ fun SettingsScreen(onBack: () -> Unit) {
                 timeTarget = null
             },
         )
+    }
+}
+
+@Composable
+private fun UpdatesCard() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val available by Updates.available.collectAsStateWithLifecycle()
+    val checking by Updates.checking.collectAsStateWithLifecycle()
+    val status by Updates.statusText.collectAsStateWithLifecycle()
+
+    SettingsCard {
+        Text("Updates", style = MaterialTheme.typography.titleLarge)
+        Spacer(Modifier.height(2.dp))
+        Text(
+            status ?: "Onward v${BuildConfig.VERSION_NAME} — checks GitHub once a day.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(8.dp))
+        Row {
+            TextButton(
+                onClick = { scope.launch { Updates.check(context, force = true) } },
+                enabled = !checking,
+            ) { Text(if (checking) "Checking…" else "Check now") }
+            available?.let { release ->
+                TextButton(onClick = { Updates.download(context, release) }) {
+                    Text("Get v${release.version} ››", color = MaterialTheme.colorScheme.tertiary)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DataCard() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val app = context.applicationContext as OnwardApp
+
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val message = try {
+                    val summary = Backup.import(context, app.database, uri)
+                    app.scheduler.syncAll()
+                    OnwardWidget().updateAll(app)
+                    summary
+                } catch (e: Exception) {
+                    "That file didn't look like an Onward backup"
+                }
+                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    SettingsCard {
+        Text("Your data", style = MaterialTheme.typography.titleLarge)
+        Spacer(Modifier.height(2.dp))
+        Text(
+            "Everything lives on this phone only. Export drops a JSON backup in Downloads; " +
+                "import restores it.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(8.dp))
+        Row {
+            TextButton(onClick = {
+                scope.launch {
+                    val message = try {
+                        "Saved ${Backup.export(context, app.database)} to Downloads"
+                    } catch (e: Exception) {
+                        "Export didn't work — try again?"
+                    }
+                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                }
+            }) { Text("Export backup") }
+            TextButton(onClick = { importLauncher.launch(arrayOf("application/json")) }) {
+                Text("Import")
+            }
+        }
     }
 }
 

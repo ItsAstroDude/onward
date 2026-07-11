@@ -16,8 +16,14 @@ Built as a forgiving habit system, not a food-logging app:
 - **Shopping list** — seeded with the staples, tied to the Sunday grocery reminder.
 - **Loose calorie tracker** *(optional, off by default)* — quick-add rough estimates and a 7-day
   trend. No targets, no "over budget" states, never touches the streak.
+- **Home/cover-screen widget** — the streak at a glance, resizable in both dimensions from a tiny
+  number up to a full card with today's meals and a one-tap check-off.
+- **History calendar** — every month of hits and free misses (nothing is ever red), with optional
+  per-day notes. A one-day "And yesterday?" grace chip catches forgotten check-ins.
+- **Self-updating** — checks GitHub Releases once a day and installs new versions in-app.
+- **Backup** — JSON export/import of everything, from Settings.
 
-Fully offline and local (Room). No backend, no accounts.
+Fully offline and local (Room) apart from the update check. No backend, no accounts.
 
 ## Tech
 
@@ -32,8 +38,14 @@ Requirements: JDK 21, Android SDK with platform android-36.
 ```powershell
 $env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-21.0.10.7-hotspot"
 .\gradlew.bat :app:assembleDebug        # APK → app/build/outputs/apk/debug/
+.\gradlew.bat :app:assembleRelease      # signed release APK (needs key.properties)
 .\gradlew.bat :app:testDebugUnitTest    # streak-engine unit tests
 ```
+
+**Releases are signed.** `key.properties` (not in git) points at the release keystore in
+`C:\Users\andre\.android\onward-release.keystore`. Ship releases via
+`gh release create vX.Y.Z <apk>` — installed apps pick them up through the in-app updater.
+Never ship a release signed with a different key: devices will refuse to update in place.
 
 Install on a device/emulator:
 

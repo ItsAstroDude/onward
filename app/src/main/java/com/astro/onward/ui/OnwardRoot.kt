@@ -37,7 +37,9 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.astro.onward.OnwardApp
 import com.astro.onward.data.AppSettings
+import com.astro.onward.ui.history.HistoryScreen
 import com.astro.onward.ui.onboarding.OnboardingScreen
+import com.astro.onward.updates.Updates
 import com.astro.onward.ui.plan.PlanScreen
 import com.astro.onward.ui.settings.SettingsScreen
 import com.astro.onward.ui.sheet.CheatSheetScreen
@@ -51,6 +53,11 @@ import kotlinx.coroutines.launch
 class RootViewModel(private val app: OnwardApp) : ViewModel() {
     val settings = app.database.settingsDao().observe()
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    init {
+        // Throttled to once a day inside check(); silent when offline.
+        viewModelScope.launch { Updates.check(app) }
+    }
 
     fun completeOnboarding(startReminders: Boolean) {
         viewModelScope.launch {
@@ -156,12 +163,14 @@ private fun MainScaffold(
                 TodayScreen(
                     onOpenPlan = { navigateToTab("plan") },
                     onOpenSettings = { navController.navigate("settings") },
+                    onOpenHistory = { navController.navigate("history") },
                 )
             }
             composable("plan") { PlanScreen() }
             composable("sheet") { CheatSheetScreen() }
             composable("shopping") { ShoppingScreen() }
             composable("settings") { SettingsScreen(onBack = { navController.popBackStack() }) }
+            composable("history") { HistoryScreen(onBack = { navController.popBackStack() }) }
         }
     }
 }

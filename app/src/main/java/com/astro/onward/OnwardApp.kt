@@ -4,6 +4,7 @@ import android.app.Application
 import com.astro.onward.data.OnwardDatabase
 import com.astro.onward.reminders.Notifications
 import com.astro.onward.reminders.ReminderScheduler
+import com.astro.onward.widget.WidgetRefreshWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -22,5 +23,6 @@ class OnwardApp : Application() {
             database.ensureSeeded()
             scheduler.syncAll()
         }
+        WidgetRefreshWorker.schedule(this)
     }
 }
